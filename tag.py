@@ -17,8 +17,10 @@
 
 import sys
 import json
-import pathlib
-import os
+from pathlib import PurePath
+from os import getcwd
+from inspect import cleandoc
+from functools import partial
 
 
 VERSION = "0.1.0"
@@ -26,12 +28,12 @@ VERSION = "0.1.0"
 
 class TagsFile:
     """Tags file Context Manager."""
-    def __init__(self, directory: pathlib.PurePath) -> None:
+    def __init__(self, directory: PurePath) -> None:
         """Create a tags Context Manager."""
         self.changed = False
         self.filepath = directory.joinpath("tags.json")
         try:
-            with open(self.filepath, mode="r") as file:
+            with open(self.filepath, mode="r", encoding="utf-8") as file:
                 self.tags = json.load(file)
         except FileNotFoundError:
             self.tags = dict()
@@ -60,13 +62,13 @@ class TagsFile:
 
     def __exit__(self, exc_type, exc_value, traceback):
         if self.changed:
-            with open(self.filepath, mode="w") as file:
+            with open(self.filepath, mode="w", encoding="utf-8") as file:
                 file.write(json.dumps(self.tags, indent=4))
 
 
 def open_tags(filepath: str) -> TagsFile:
     """Open the tags file associated with the given file path."""
-    return TagsFile(pathlib.PurePath(filepath).parent)
+    return TagsFile(PurePath(filepath).parent)
 
 
 
@@ -74,39 +76,44 @@ def print_help(long=False) -> None:
     """Print program help information."""
     print(f"Usage: {sys.argv[0]} [OPTIONS] COMMAND")
     if long:
-        print(f"")
-        print(f"COMMANDS")
-        print(f"  ls <file>")
-        print(f"  | List the tags associated with a file.")
-        print(f"")
-        print(f"  filter <tag>")
-        print(f"  | List files tagged with a tag.")
-        print(f"")
-        print(f"  add <tag> <file>")
-        print(f"  | Add a tag to a file.")
-        print(f"")
-        print(f"  rm <tag> <file>")
-        print(f"  | Remove a tag from a file.")
+        print("")
+        print(cleandoc(
+        """
+        COMMANDS
+          ls <file>
+          | List the tags associated with a file.
+
+          filter <tag>
+          | List files tagged with a tag.
+
+          add <tag> <file>
+          | Add a tag to a file.
+
+          rm <tag> <file>
+          | Remove a tag from a file.
+        """))
 
 def print_version() -> None:
     """Print program version information."""
-    print(f"Tag {VERSION}")
-    print(f"Copyright (C) 2022 Trevor Last")
-    print(f"License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>")
-    print(f"This is free software: you are free to change and redistribute it.")
-    print(f"There is NO WARRANTY, to the extent permitted by law.")
+    print(cleandoc(
+    f"""Tag {VERSION}
+    Copyright (C) 2022 Trevor Last
+    License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>
+    This is free software: you are free to change and redistribute it.
+    There is NO WARRANTY, to the extent permitted by law.
+    """))
 
 
 def ls_tags(filepath: str) -> None:
     """Print the tags attached to the file."""
     with open_tags(filepath) as tags:
-        k = pathlib.PurePath(filepath).name
+        k = PurePath(filepath).name
         for tag in tags.get_tags(k):
             print(tag)
 
 def filter_tags(tag: str) -> None:
     """Print all files that match the tag."""
-    with open_tags(os.getcwd()) as tags:
+    with open_tags(getcwd()) as tags:
         matches = [
             file
             for (file,file_tags) in tags.tags.items()
@@ -118,46 +125,67 @@ def filter_tags(tag: str) -> None:
 def add_tag(tag: str, filepath: str) -> None:
     """Add a tag to the file."""
     with open_tags(filepath) as tags:
-        key = pathlib.PurePath(filepath).name
+        key = PurePath(filepath).name
         tags.add_tag(key, tag)
 
 def rm_tag(tag: str, filepath: str) -> None:
     """Remove a tag from the file."""
     with open_tags(filepath) as tags:
-        key = pathlib.PurePath(filepath).name
+        key = PurePath(filepath).name
         tags.remove_tag(key, tag)
 
 
-def run_command(command: list[str]) -> None:
-    """Execute a tagging command."""
-    match command:
-        case "ls", filepath:
-            ls_tags(filepath)
+def handle_argv(argv: list[str]) -> list:
+    """Handle argv and return a list of supplied commands, if any."""
+    COMMANDS = {
+        "ls":ls_tags,
+        "filter":filter_tags,
+        "add":add_tag,
+        "rm":rm_tag,
+    }
 
-        case "filter", tag:
-            filter_tags(tag)
+    commands = []
 
-        case "add", tag, filepath:
-            add_tag(tag, filepath)
+    cmd: partial = None
+    arg_count = -1
 
-        case "rm", tag, filepath:
-            rm_tag(tag, filepath)
+    for arg in argv:
+        if cmd is not None:
+            if len(cmd.args) < arg_count:
+                cmd = partial(cmd, arg)
+            elif len(cmd.args) == arg_count:
+                commands.append(cmd)
+                cmd = None
+                arg_count = -1
+        else:
+            match arg:
+                case "--help":
+                    print_help(long=True)
+                    sys.exit()
 
-        case unrecognized:
-            print(f"""Unrecognized command '{" ".join(unrecognized)}'""")
+                case "--version":
+                    print_version()
+                    sys.exit()
+
+                case unrecognized:
+                    if unrecognized in COMMANDS:
+                        c = COMMANDS[unrecognized]
+                        cmd = partial(c)
+                        arg_count = c.__code__.co_argcount
+                    else:
+                        raise Exception(f"Unrecognized option '{unrecognized}'")
+
+    if cmd is not None:
+        commands.append(cmd)
+    return commands
 
 def main(args: list[str]):
     if not args:
         print_help(long=False)
-        exit()
-    elif "--help" in args:
-        print_help(long=True)
-        exit()
-    elif "--version" in args:
-        print_version()
-        exit()
-    else:
-        run_command(args)
+        sys.exit()
+    commands = handle_argv(args)
+    for command in commands:
+        command()
 
 
 if __name__ == '__main__':
