@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Tag.py -- Manage tags on files.
+# filetagging.py -- Manage tags on files.
 # Copyright (C) 2022 Trevor Last
 #
 # This program is free software: you can redistribute it and/or modify
@@ -14,16 +14,28 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+Utilities to manage file tags.
+"""
 
-import sys
+__all__ = [
+    "main",
+    "ls_tags",
+    "filter_tags",
+    "add_tag",
+    "rm_tag",
+    "open_tags",
+    "TagsFile"
+]
+__author__ = "Trevor Last"
+__version__ = "0.1.0"
+
 import json
-from pathlib import PurePath
-from os import getcwd
-from inspect import cleandoc
+import sys
 from functools import partial
-
-
-VERSION = "0.1.0"
+from inspect import cleandoc
+from os import getcwd
+from pathlib import PurePath
 
 
 class TagsFile:
@@ -36,14 +48,22 @@ class TagsFile:
             with open(self.filepath, mode="r", encoding="utf-8") as file:
                 self.tags = json.load(file)
         except FileNotFoundError:
-            self.tags = dict()
+            self.tags = {}
 
     def get_tags(self, filename: str) -> list[str]:
-        """Get the tags associated with a file."""
+        """Get the tags associated with a file.
+
+        filename should be a file NAME, not a file PATH. Strip the directory
+        off first!
+        """
         return self.tags[filename]
 
     def add_tag(self, filename: str, tag: str) -> None:
-        """Add a tag to a file."""
+        """Add a tag to a file.
+
+        filename should be a file NAME, not a file PATH. Strip the directory
+        off first!
+        """
         if filename in self.tags:
             if tag not in self.tags[filename]:
                 self.tags[filename].append(tag)
@@ -52,7 +72,11 @@ class TagsFile:
         self.changed = True
 
     def remove_tag(self, filename: str, tag: str) -> None:
-        """Delete a tag from a file."""
+        """Delete a tag from a file.
+
+        filename should be a file NAME, not a file PATH. Strip the directory
+        off first!
+        """
         if tag in self.tags[filename]:
             self.tags[filename].remove(tag)
             self.changed = True
@@ -67,13 +91,17 @@ class TagsFile:
 
 
 def open_tags(filepath: str) -> TagsFile:
-    """Open the tags file associated with the given file path."""
+    """Open the tags file associated with the given filepath."""
     return TagsFile(PurePath(filepath).parent)
 
 
 
 def print_help(long=False) -> None:
-    """Print program help information."""
+    """Print program help information.
+
+    Keyword arguments:
+    long -- whether to print full usage details (default False)
+    """
     print(f"Usage: {sys.argv[0]} [OPTIONS] COMMAND")
     if long:
         print("")
@@ -96,7 +124,7 @@ def print_help(long=False) -> None:
 def print_version() -> None:
     """Print program version information."""
     print(cleandoc(
-    f"""Tag {VERSION}
+    f"""Tag {__version__}
     Copyright (C) 2022 Trevor Last
     License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>
     This is free software: you are free to change and redistribute it.
@@ -186,7 +214,3 @@ def main(args: list[str]):
     commands = handle_argv(args)
     for command in commands:
         command()
-
-
-if __name__ == '__main__':
-    main(sys.argv[1:])
