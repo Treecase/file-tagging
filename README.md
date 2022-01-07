@@ -14,7 +14,6 @@ Building
 --------
 Install the latest `setuptools` and `build` modules, then build the package.
 ```
-pip install --upgrade setuptools
-pip install --upgrade build
+pip install --upgrade setuptools build
 python -m build
 ```

@@ -14,20 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""
-Utilities to manage file tags.
-"""
 
-__all__ = [
-    "main",
-    "ls_tags",
-    "filter_tags",
-    "add_tag",
-    "rm_tag",
-    "open_tags",
-    "TagsFile"
-]
-__author__ = "Trevor Last"
 __version__ = "0.1.0"
 
 import json

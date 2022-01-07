@@ -3,3 +3,4 @@ testing/
 dist/
 __pycache__/
 *.egg-info
+test.py
