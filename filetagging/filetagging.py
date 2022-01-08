@@ -14,25 +14,32 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""filetagging implementation."""
 
 __version__ = "0.1.0"
 
 import json
-from os import getcwd
-from pathlib import PurePath
+from pathlib import Path, PurePath
 
 
 class TagsFile:
     """Tags file Context Manager."""
-    def __init__(self, directory: PurePath) -> None:
-        """Create a tags Context Manager."""
+    def __init__(self, directory: PurePath, create_new: bool=False) -> None:
+        """Create a tags Context Manager.
+
+        Keyword arguments:
+        create_new -- whether an error should be raised if the tags.json file
+            doesn't already exist (default False)
+        """
         self.changed = False
-        self.filepath = directory.joinpath("tags.json")
+        self.filepath = Path(directory/"tags.json")
         try:
-            with open(self.filepath, mode="r", encoding="utf-8") as file:
-                self.tags = json.load(file)
-        except FileNotFoundError:
-            self.tags = {}
+            self.tags = json.loads(self.filepath.read_text(encoding="utf-8"))
+        except FileNotFoundError as err:
+            if create_new:
+                self.tags = {}
+            else:
+                raise err
 
     def get_tags(self, filename: str) -> list[str]:
         """Get the tags associated with a file.
@@ -64,19 +71,33 @@ class TagsFile:
         if tag in self.tags[filename]:
             self.tags[filename].remove(tag)
             self.changed = True
+        if not self.tags[filename]:
+            del self.tags[filename]
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         if self.changed:
-            with open(self.filepath, mode="w", encoding="utf-8") as file:
-                file.write(json.dumps(self.tags, indent=4))
+            if self.tags:
+                with open(self.filepath, mode="w", encoding="utf-8") as file:
+                    file.write(json.dumps(self.tags, indent=4))
+            elif Path(self.filepath).exists():
+                Path(self.filepath).unlink()
 
 
-def open_tags(filepath: str) -> TagsFile:
-    """Open the tags file associated with the given filepath."""
-    return TagsFile(PurePath(filepath).parent)
+def open_tags(filepath: str, create_new: bool=False) -> TagsFile:
+    """Open the tags file associated with the given filepath.
+
+    Keyword arguments:
+    create_new -- whether an error should be raised if the tags.json file
+        doesn't already exist (default False)
+    """
+    path = Path(filepath)
+    if path.is_dir():
+        return TagsFile(path, create_new=create_new)
+    else:
+        return TagsFile(path.parent, create_new=create_new)
 
 
 def ls_tags(filepath: str) -> None:
@@ -87,9 +108,13 @@ def ls_tags(filepath: str) -> None:
             print(tag)
 
 
-def filter_tags(tag: str) -> None:
-    """Print all files that match the tag."""
-    with open_tags(getcwd()) as tags:
+def filter_tags(tag: str, directory: str=".") -> None:
+    """Print all files that match the tag.
+    
+    Keyword arguments:
+    directory -- The directory to filter in.
+    """
+    with open_tags(directory) as tags:
         matches = [
             file
             for (file,file_tags) in tags.tags.items()
@@ -101,7 +126,7 @@ def filter_tags(tag: str) -> None:
 
 def add_tag(tag: str, filepath: str) -> None:
     """Add a tag to the file."""
-    with open_tags(filepath) as tags:
+    with open_tags(filepath, create_new=True) as tags:
         key = PurePath(filepath).name
         tags.add_tag(key, tag)
 

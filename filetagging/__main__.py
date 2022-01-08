@@ -14,13 +14,11 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""
-filetagging script entry point.
-"""
+"""filetagging script entry point."""
 
 import sys
-from functools import partial
 from inspect import cleandoc
+from pathlib import Path
 
 from .filetagging import ls_tags, filter_tags, add_tag, rm_tag, __version__
 
@@ -31,11 +29,18 @@ def print_help(long: bool=False) -> None:
     Keyword arguments:
     long -- whether to print full usage details (default False)
     """
-    print(f"Usage: {sys.argv[0]} [OPTIONS] COMMAND")
+    print(f"Usage: {sys.argv[0]} [OPTIONS] COMMANDS")
     if long:
         print("")
         print(cleandoc(
         """
+        OPTIONS
+          --help
+          | Display this help information.
+
+          --version
+          | Display version information.
+
         COMMANDS
           ls <file>
           | List the tags associated with a file.
@@ -62,58 +67,50 @@ def print_version() -> None:
     """))
 
 
-def handle_argv(argv: list[str]) -> list[partial]:
+def handle_argv(argv: list[str]) -> None:
     """Handle argv and return a list of supplied commands, if any."""
-    COMMANDS = {
-        "ls":ls_tags,
-        "filter":filter_tags,
-        "add":add_tag,
-        "rm":rm_tag,
-    }
+    while argv:
+        match argv:
+            case "--help", *rest:
+                argv = rest
+                print_help(long=True)
+                sys.exit()
 
-    commands = []
+            case "--version", *rest:
+                argv = rest
+                print_version()
+                sys.exit()
 
-    cmd: partial = None
-    arg_count = -1
+            case "ls", filepath, *rest:
+                argv = rest
+                ls_tags(filepath)
 
-    for arg in argv:
-        if cmd is not None:
-            if len(cmd.args) < arg_count:
-                cmd = partial(cmd, arg)
-            elif len(cmd.args) == arg_count:
-                commands.append(cmd)
-                cmd = None
-                arg_count = -1
-        else:
-            match arg:
-                case "--help":
-                    print_help(long=True)
-                    sys.exit()
+            case "filter", tag, *rest:
+                if rest and Path(rest[0]).exists():
+                    argv = rest[1:]
+                    filter_tags(tag, rest[0])
+                else:
+                    argv = rest
+                    filter_tags(tag)
 
-                case "--version":
-                    print_version()
-                    sys.exit()
+            case "add", tag, filepath, *rest:
+                argv = rest
+                add_tag(tag, filepath)
 
-                case unrecognized:
-                    if unrecognized in COMMANDS:
-                        c = COMMANDS[unrecognized]
-                        cmd = partial(c)
-                        arg_count = c.__code__.co_argcount
-                    else:
-                        raise Exception(f"Unrecognized option '{unrecognized}'")
+            case "rm", tag, filepath, *rest:
+                argv = rest
+                rm_tag(tag, filepath)
 
-    if cmd is not None:
-        commands.append(cmd)
-    return commands
+            case unrecognized, *rest:
+                argv = rest
+                raise RuntimeError(f"unrecognized option '{unrecognized}'")
 
 
 def main(argv: list[str]) -> int:
     """Package main."""
     if not argv:
-        print_help(long=False)
-        sys.exit()
-    for command in handle_argv(argv):
-        command()
+        sys.exit(print_help(long=False))
+    handle_argv(argv)
     return 0
 
 
