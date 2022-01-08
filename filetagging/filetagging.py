@@ -18,9 +18,6 @@
 __version__ = "0.1.0"
 
 import json
-import sys
-from functools import partial
-from inspect import cleandoc
 from os import getcwd
 from pathlib import PurePath
 
@@ -82,49 +79,13 @@ def open_tags(filepath: str) -> TagsFile:
     return TagsFile(PurePath(filepath).parent)
 
 
-
-def print_help(long=False) -> None:
-    """Print program help information.
-
-    Keyword arguments:
-    long -- whether to print full usage details (default False)
-    """
-    print(f"Usage: {sys.argv[0]} [OPTIONS] COMMAND")
-    if long:
-        print("")
-        print(cleandoc(
-        """
-        COMMANDS
-          ls <file>
-          | List the tags associated with a file.
-
-          filter <tag>
-          | List files tagged with a tag.
-
-          add <tag> <file>
-          | Add a tag to a file.
-
-          rm <tag> <file>
-          | Remove a tag from a file.
-        """))
-
-def print_version() -> None:
-    """Print program version information."""
-    print(cleandoc(
-    f"""Tag {__version__}
-    Copyright (C) 2022 Trevor Last
-    License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>
-    This is free software: you are free to change and redistribute it.
-    There is NO WARRANTY, to the extent permitted by law.
-    """))
-
-
 def ls_tags(filepath: str) -> None:
     """Print the tags attached to the file."""
     with open_tags(filepath) as tags:
         k = PurePath(filepath).name
         for tag in tags.get_tags(k):
             print(tag)
+
 
 def filter_tags(tag: str) -> None:
     """Print all files that match the tag."""
@@ -137,67 +98,16 @@ def filter_tags(tag: str) -> None:
         for match in matches:
             print(match)
 
+
 def add_tag(tag: str, filepath: str) -> None:
     """Add a tag to the file."""
     with open_tags(filepath) as tags:
         key = PurePath(filepath).name
         tags.add_tag(key, tag)
 
+
 def rm_tag(tag: str, filepath: str) -> None:
     """Remove a tag from the file."""
     with open_tags(filepath) as tags:
         key = PurePath(filepath).name
         tags.remove_tag(key, tag)
-
-
-def handle_argv(argv: list[str]) -> list:
-    """Handle argv and return a list of supplied commands, if any."""
-    COMMANDS = {
-        "ls":ls_tags,
-        "filter":filter_tags,
-        "add":add_tag,
-        "rm":rm_tag,
-    }
-
-    commands = []
-
-    cmd: partial = None
-    arg_count = -1
-
-    for arg in argv:
-        if cmd is not None:
-            if len(cmd.args) < arg_count:
-                cmd = partial(cmd, arg)
-            elif len(cmd.args) == arg_count:
-                commands.append(cmd)
-                cmd = None
-                arg_count = -1
-        else:
-            match arg:
-                case "--help":
-                    print_help(long=True)
-                    sys.exit()
-
-                case "--version":
-                    print_version()
-                    sys.exit()
-
-                case unrecognized:
-                    if unrecognized in COMMANDS:
-                        c = COMMANDS[unrecognized]
-                        cmd = partial(c)
-                        arg_count = c.__code__.co_argcount
-                    else:
-                        raise Exception(f"Unrecognized option '{unrecognized}'")
-
-    if cmd is not None:
-        commands.append(cmd)
-    return commands
-
-def main(args: list[str]):
-    if not args:
-        print_help(long=False)
-        sys.exit()
-    commands = handle_argv(args)
-    for command in commands:
-        command()

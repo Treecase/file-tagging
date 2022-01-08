@@ -19,7 +19,6 @@ Utilities to manage file tags.
 """
 
 from .filetagging import (
-    main,
     ls_tags,
     filter_tags,
     add_tag,
@@ -30,7 +29,6 @@ from .filetagging import (
 )
 
 __all__ = [
-    "main",
     "ls_tags",
     "filter_tags",
     "add_tag",
