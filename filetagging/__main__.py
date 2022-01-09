@@ -20,7 +20,14 @@ import sys
 from inspect import cleandoc
 from pathlib import Path
 
-from .filetagging import ls_tags, filter_tags, add_tag, rm_tag, __version__
+from .filetagging import (
+    __version__,
+    ls_tags,
+    filter_tags,
+    add_tag,
+    rm_tag,
+    mv_tagged_file,
+)
 
 
 def print_help(long: bool=False) -> None:
@@ -53,6 +60,9 @@ def print_help(long: bool=False) -> None:
 
           rm <tag> <file>
           | Remove a tag from a file.
+
+          mv <file> <destination>
+          | Move or rename a tagged file.
         """))
 
 
@@ -100,6 +110,10 @@ def handle_argv(argv: list[str]) -> None:
             case "rm", tag, filepath, *rest:
                 argv = rest
                 rm_tag(tag, filepath)
+
+            case "mv", file, destination, *rest:
+                argv = rest
+                mv_tagged_file(file, destination)
 
             case unrecognized, *rest:
                 argv = rest

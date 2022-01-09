@@ -31,23 +31,34 @@ class TagsFile:
         create_new -- whether an error should be raised if the tags.json file
             doesn't already exist (default False)
         """
-        self.changed = False
         self.filepath = Path(directory/"tags.json")
         try:
-            self.tags = json.loads(self.filepath.read_text(encoding="utf-8"))
+            self.tags = {
+                k:set(v) for k,v in json.loads(self.filepath.read_text(encoding="utf-8")).items()
+            }
         except FileNotFoundError as err:
             if create_new:
                 self.tags = {}
             else:
                 raise err
 
-    def get_tags(self, filename: str) -> list[str]:
+    def get_tags(self, filename: str) -> set[str]:
         """Get the tags associated with a file.
 
         filename should be a file NAME, not a file PATH. Strip the directory
         off first!
         """
         return self.tags[filename]
+
+    def set_tags(self, filename: str, tags: set[str]) -> None:
+        """Set the tags associated with a file.
+
+        filename should be a file NAME, not a file PATH. Strip the directory
+        off first!
+        """
+        self.tags[filename] = set(tags)
+        if not self.tags[filename]:
+            del self.tags[filename]
 
     def add_tag(self, filename: str, tag: str) -> None:
         """Add a tag to a file.
@@ -56,11 +67,9 @@ class TagsFile:
         off first!
         """
         if filename in self.tags:
-            if tag not in self.tags[filename]:
-                self.tags[filename].append(tag)
+            self.tags[filename].add(tag)
         else:
-            self.tags[filename] = [tag]
-        self.changed = True
+            self.tags[filename] = {tag}
 
     def remove_tag(self, filename: str, tag: str) -> None:
         """Delete a tag from a file.
@@ -68,9 +77,7 @@ class TagsFile:
         filename should be a file NAME, not a file PATH. Strip the directory
         off first!
         """
-        if tag in self.tags[filename]:
-            self.tags[filename].remove(tag)
-            self.changed = True
+        self.tags[filename].discard(tag)
         if not self.tags[filename]:
             del self.tags[filename]
 
@@ -78,12 +85,15 @@ class TagsFile:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        if self.changed:
-            if self.tags:
-                with open(self.filepath, mode="w", encoding="utf-8") as file:
-                    file.write(json.dumps(self.tags, indent=4))
-            elif Path(self.filepath).exists():
-                Path(self.filepath).unlink()
+        # save the tagsfile if the tags are not empty
+        if self.tags:
+            with open(self.filepath, mode="w", encoding="utf-8") as file:
+                file.write(json.dumps(
+                    {k:list(v) for k,v in self.tags.items()},
+                    indent=4))
+        # if the tags are empty, and the tagsfile exists, delete it
+        elif Path(self.filepath).exists():
+            Path(self.filepath).unlink()
 
 
 def open_tags(filepath: str, create_new: bool=False) -> TagsFile:
@@ -110,7 +120,7 @@ def ls_tags(filepath: str) -> None:
 
 def filter_tags(tag: str, directory: str=".") -> None:
     """Print all files that match the tag.
-    
+
     Keyword arguments:
     directory -- The directory to filter in.
     """
@@ -136,3 +146,22 @@ def rm_tag(tag: str, filepath: str) -> None:
     with open_tags(filepath) as tags:
         key = PurePath(filepath).name
         tags.remove_tag(key, tag)
+
+
+def mv_tagged_file(file: str, destination: str) -> None:
+    """Move or rename a tagged file."""
+    path1,path2 = PurePath(file), PurePath(destination)
+    # rename file
+    if path1.parent == path2.parent:
+        with open_tags(file) as tagfile:
+            key1,key2 = path1.name, path2.name
+            tagfile.set_tags(key2, tagfile.get_tags(key1))
+            tagfile.set_tags(key1, set())
+    # move file
+    else:
+        with (  open_tags(file) as tf1,
+                open_tags(destination, create_new=True) as tf2):
+            key1,key2 = path1.name, path2.name
+            tf2.set_tags(key2, tf1.get_tags(key1))
+            tf1.set_tags(key1, set())
+    Path(file).rename(destination)

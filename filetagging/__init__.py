@@ -19,21 +19,23 @@ Utilities to manage file tags.
 """
 
 from .filetagging import (
+    __version__,
+    TagsFile,
+    open_tags,
     ls_tags,
     filter_tags,
     add_tag,
     rm_tag,
-    open_tags,
-    TagsFile,
-    __version__
+    mv_tagged_file,
 )
 
 __all__ = [
+    "TagsFile",
+    "open_tags",
     "ls_tags",
     "filter_tags",
     "add_tag",
     "rm_tag",
-    "open_tags",
-    "TagsFile"
+    "mv_tagged_file",
 ]
 __author__ = "Trevor Last"
