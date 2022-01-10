@@ -1,7 +1,11 @@
 
-TAGGING
-=======
-A program providing some utilities to manage tagging of files.
+FILETAGGING
+===========
+A Python package providing some utilities to manage tagging of files.
+
+Usage: `filetagging [OPTIONS]... COMMANDS...`
+
+Commands are executed in the order they are specified.
 
 Commands
 --------
@@ -11,20 +15,20 @@ Commands
 - `rm <tag> <filename>` -- Remove a tag from a file.
 - `mv <source> <destination>` -- Move or rename a file.
 
-Building
---------
-Install the latest `setuptools` and `build` modules and build the package.
+Building and Installation
+-------------------------
+Install the latest `setuptools` and `build` packages and build the `filetagging` module.
 ```
 pip install --upgrade setuptools build
 python -m build
 ```
 
-And install the built package through `pip`.
+Install the built package through `pip`.
 ```
 pip install filetagging*.whl
 ```
 
-And finally run the installed package.
+And finally run the installed `filetagging` package.
 ```
 python -m filetagging
 ```

@@ -15,7 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-Usage: python -m filetagging [OPTIONS] COMMANDS
+Usage: python -m filetagging [OPTIONS]... COMMANDS...
+
+Commands are executed in the order they are specified.
 
 OPTIONS
     --help
