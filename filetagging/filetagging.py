@@ -172,19 +172,30 @@ def rm_tag(tag: str, filepath: str) -> None:
 
 
 def mv_tagged_file(file: str, destination: str) -> None:
-    """Move or rename a tagged file."""
-    path1,path2 = PurePath(file), PurePath(destination)
+    """Move or rename a tagged file.
+
+    ``destination`` can either be an explicit filepath, or just a directory, in
+    which case the name of the file will be taken from the ``file`` parameter.
+    """
+    def copy_tags(
+            path1: PurePath, path2: PurePath,
+            tagfile1: TagsFile, tagfile2: TagsFile) -> None:
+        """Helper function for copying tags."""
+        key1,key2 = path1.name, path2.name
+        tagfile2.set_tags(key2, tagfile1.get_tags(key1))
+        tagfile1.set_tags(key1, set())
+
+    path1,path2 = Path(file), Path(destination)
+    assert path1.is_file()
+    if path2.is_dir():
+        path2 = path2/path1.name
     # rename file
     if path1.parent == path2.parent:
         with open_tags(file) as tagfile:
-            key1,key2 = path1.name, path2.name
-            tagfile.set_tags(key2, tagfile.get_tags(key1))
-            tagfile.set_tags(key1, set())
+            copy_tags(path1, path2, tagfile, tagfile)
     # move file
     else:
-        with (  open_tags(file) as tf1,
-                open_tags(destination, create_new=True) as tf2):
-            key1,key2 = path1.name, path2.name
-            tf2.set_tags(key2, tf1.get_tags(key1))
-            tf1.set_tags(key1, set())
-    Path(file).rename(destination)
+        with (  open_tags(file) as tagfile1,
+                open_tags(destination, create_new=True) as tagfile2):
+            copy_tags(path1, path2, tagfile1, tagfile2)
+    path1.rename(path2)
