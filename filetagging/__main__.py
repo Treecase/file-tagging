@@ -14,7 +14,32 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""filetagging script entry point."""
+"""
+Usage: python -m filetagging [OPTIONS] COMMANDS
+
+OPTIONS
+    --help
+    | Display this help and exit.
+
+    --version
+    | Display version information and exit.
+
+COMMANDS
+    ls <file>
+    | List the tags associated with a file.
+
+    filter <tag>
+    | List files tagged with a tag.
+
+    add <tag> <file>
+    | Add a tag to a file.
+
+    rm <tag> <file>
+    | Remove a tag from a file.
+
+    mv <file> <destination>
+    | Move or rename a tagged file.
+"""
 
 import sys
 from inspect import cleandoc
@@ -33,37 +58,13 @@ from .filetagging import (
 def print_help(long: bool=False) -> None:
     """Print program help information.
 
-    Keyword arguments:
-    long -- whether to print full usage details (default False)
+    If ``long`` is ``True``, full usage details will be printed (default
+    ``False``).
     """
-    print(f"Usage: {sys.argv[0]} [OPTIONS] COMMANDS")
+    shortdoc,longdoc = cleandoc(__doc__).split("\n\n", maxsplit=1)
+    print(shortdoc)
     if long:
-        print("")
-        print(cleandoc(
-        """
-        OPTIONS
-          --help
-          | Display this help information.
-
-          --version
-          | Display version information.
-
-        COMMANDS
-          ls <file>
-          | List the tags associated with a file.
-
-          filter <tag>
-          | List files tagged with a tag.
-
-          add <tag> <file>
-          | Add a tag to a file.
-
-          rm <tag> <file>
-          | Remove a tag from a file.
-
-          mv <file> <destination>
-          | Move or rename a tagged file.
-        """))
+        print("\n" + longdoc)
 
 
 def print_version() -> None:
@@ -83,13 +84,11 @@ def handle_argv(argv: list[str]) -> None:
         match argv:
             case "--help", *rest:
                 argv = rest
-                print_help(long=True)
-                sys.exit()
+                sys.exit(print_help(long=True))
 
             case "--version", *rest:
                 argv = rest
-                print_version()
-                sys.exit()
+                sys.exit(print_version())
 
             case "ls", filepath, *rest:
                 argv = rest
@@ -117,7 +116,9 @@ def handle_argv(argv: list[str]) -> None:
 
             case unrecognized, *rest:
                 argv = rest
-                raise RuntimeError(f"unrecognized option '{unrecognized}'")
+                print(f"Unrecognized option '{unrecognized}'")
+                print("Try 'python -m filetagging' for more information.")
+                sys.exit()
 
 
 def main(argv: list[str]) -> int:
