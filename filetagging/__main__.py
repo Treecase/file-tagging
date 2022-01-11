@@ -20,6 +20,10 @@ Usage: python -m filetagging [OPTIONS]... COMMANDS...
 Commands are executed in the order they are specified.
 
 OPTIONS
+    -f, --file <file>
+    | Execute a series of commands from a file. If the file is given as -, read
+    | commands from standard input.
+
     --help
     | Display this help and exit.
 
@@ -46,6 +50,7 @@ COMMANDS
 import sys
 from inspect import cleandoc
 from pathlib import Path
+from typing import Iterator
 
 from .filetagging import (
     __version__,
@@ -80,10 +85,61 @@ def print_version() -> None:
     """))
 
 
+def parse_quoted(quote_ch: str, iterator: Iterator) -> str:
+    """Parse out a quoted string."""
+    token = ""
+    for char in iterator:
+        if char == quote_ch:
+            return token
+        else:
+            token += char
+    raise RuntimeError(f"Unmatched {quote_ch}")
+
+def parse_line(batch_data: str) -> None:
+    """Parse out a batch file."""
+    tokens = []
+    token = ""
+    iterator = iter(batch_data)
+    for char in iterator:
+        if char in "\"'":
+            if token:
+                tokens.append(token)
+            token = ""
+            tokens.append(parse_quoted(char, iterator))
+        elif char.isspace():
+            if token:
+                tokens.append(token)
+            token = ""
+        elif char == "\\":
+            token += next(iterator)
+        else:
+            token += char
+    if token:
+        tokens.append(token)
+    handle_argv(tokens)
+
+
+def run_batchfile(buffer) -> None:
+    """Run a batchfile."""
+    while True:
+        line = buffer.readline()
+        if line == "":
+            break
+        parse_line(line)
+
+
 def handle_argv(argv: list[str]) -> None:
-    """Handle argv and return a list of supplied commands, if any."""
+    """Handle argv."""
     while argv:
         match argv:
+            case ("-f", filepath, *rest) | ("--file", filepath, *rest):
+                argv = rest
+                if filepath == "-":
+                    run_batchfile(sys.stdin)
+                else:
+                    with open(filepath, mode="r", encoding="utf-8") as file:
+                        run_batchfile(file)
+
             case "--help", *rest:
                 argv = rest
                 sys.exit(print_help(long=True))
