@@ -136,9 +136,16 @@ def open_tags(filepath: str, create_new: bool=False) -> TagsFile:
 def ls_tags(filepath: str) -> None:
     """Print the tags attached to the file."""
     with open_tags(filepath) as tags:
-        k = PurePath(filepath).name
-        for tag in tags.get_tags(k):
-            print(tag)
+        path = Path(filepath)
+        if path.is_dir():
+            for filename,filetags in tags.tags.items():
+                print(f"{filename}:")
+                for tag in filetags:
+                    print(tag)
+                print()
+        else:
+            for tag in tags.get_tags(path.name):
+                print(tag)
 
 
 def filter_tags(tag: str, directory: str=".") -> None:
