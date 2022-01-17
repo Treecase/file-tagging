@@ -28,22 +28,28 @@ class TagsFile:
     ``self.tags`` is a dict containing files and their associated tags.
     """
 
-    def __init__(self, directory: str, create_new: bool=False) -> None:
-        """Create a tags file Context Manager for ``directory``.
+    def __init__(self, directory: str, create_new: bool=False,
+                 discard_missing_files: bool=False) -> None:
+        """Create a tags file Context Manager for `directory`.
 
-        ``create_new`` specifies whether a ``FileNotFoundError`` should be
-        raised if the tags.json file doesn't already exist (default ``False``).
+        `create_new` specifies whether a `FileNotFoundError` should be
+        raised if the tags.json file doesn't already exist (default `False`).
+
+        If `discard_missing_files` is `True`, saved tags for nonexistent files
+        will be deleted. (default `False`)
         """
-        self._filepath = Path(directory/"tags.json")
+        self._discard_missing_files = discard_missing_files
+        self._directory = Path(directory)
+        self._filepath = self._directory/"tags.json"
         if self._filepath.exists():
             self.tags = json.loads(self._filepath.read_text(encoding="utf-8"))
         else:
             if create_new:
                 self.tags = {}
             else:
-                raise FileNotFoundError(
-                    f"Missing file '{directory}'")
+                raise FileNotFoundError(f"Missing file '{self._filepath}'")
         self.tags = _validate_tags_data(self.tags)
+        self._filter_missing_files()
 
     def get_tags(self, filename: str) -> set[str]:
         """Get the tags associated with a file.
@@ -84,10 +90,20 @@ class TagsFile:
         if not self.tags[filename]:
             del self.tags[filename]
 
+    def _filter_missing_files(self) -> None:
+        """Remove tags from nonexistent files."""
+        if self._discard_missing_files:
+            self.tags = {
+                k:v
+                for k,v in self.tags.items()
+                if (self._directory/k).exists()
+            }
+
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        self._filter_missing_files()
         # save the tagsfile if the tags are not empty
         if self.tags:
             self._filepath.write_text(
@@ -120,17 +136,14 @@ def _validate_tags_data(data: dict) -> dict[str, set[str]]:
     return {k:set(str(i) for i in v) for k,v in data.items()}
 
 
-def open_tags(filepath: str, create_new: bool=False) -> TagsFile:
-    """Open the tags file associated with ``filepath``.
+def open_tags(filepath: str, *args, **kwargs) -> TagsFile:
+    """Open the tags file associated with `filepath`.
 
-    ``create_new`` specifies whether a ``FileNotFoundError`` should be raised
-    if the tags.json file doesn't already exist (default ``False``).
+    `args` and `kwargs` are passed directly to the `TagsFile` constructor.
     """
     path = Path(filepath)
-    if path.is_dir():
-        return TagsFile(path, create_new=create_new)
-    else:
-        return TagsFile(path.parent, create_new=create_new)
+    path = path if path.is_dir() else path.parent
+    return TagsFile(path, *args, **kwargs)
 
 
 def ls_tags(filepath: str) -> None:

@@ -31,10 +31,11 @@ OPTIONS
     | Display version information and exit.
 
 COMMANDS
-    ls <file>
-    | List the tags associated with a file.
+    ls [<file> | <directory>]
+    | List the tags associated with a file or directory. If no path is
+    | supplied, list tags in the current directory.
 
-    filter <tag>
+    filter <tag> [directory]
     | List files tagged with a tag.
 
     add <tag> <file>
@@ -49,6 +50,7 @@ COMMANDS
 
 import sys
 from inspect import cleandoc
+from io import IOBase
 from pathlib import Path
 from typing import Iterator
 
@@ -95,7 +97,8 @@ def parse_quoted(quote_ch: str, iterator: Iterator) -> str:
             token += char
     raise RuntimeError(f"Unmatched {quote_ch}")
 
-def parse_line(batch_data: str) -> None:
+
+def parse_line(batch_data: str) -> list[str]:
     """Parse out a batch file."""
     tokens = []
     token = ""
@@ -116,26 +119,76 @@ def parse_line(batch_data: str) -> None:
             token += char
     if token:
         tokens.append(token)
-    handle_argv(tokens)
+    return tokens
 
 
-def run_batchfile(buffer) -> None:
+def run_batchfile(buffer: IOBase) -> None:
     """Run a batchfile."""
+    for line in buffer.readlines():
+        run_commands(parse_line(line))
+
+
+def run_interactive() -> None:
+    """Run an interactive session."""
     while True:
-        line = buffer.readline()
-        if line == "":
+        try:
+            line = input("> ")
+        except EOFError:
             break
-        parse_line(line)
+        try:
+            run_commands(parse_line(line))
+        except Exception as err:
+            print(f"ERROR: {err}")
 
 
-def handle_argv(argv: list[str]) -> None:
+def run_commands(commands: list[str]) -> None:
+    """Execute a list of commands."""
+    while commands:
+        match commands:
+            # ls with a path
+            case "ls", filepath, *rest:
+                commands = rest
+                ls_tags(filepath)
+            # ls with no path
+            case "ls", *rest:
+                commands = rest
+                ls_tags(".")
+
+            # filter with a directory
+            case "filter", tag, directory, *rest if Path(directory).is_dir():
+                commands = rest
+                filter_tags(tag, directory)
+            # filter with no directory
+            case "filter", tag, *rest:
+                commands = rest
+                filter_tags(tag)
+
+            case "add", tag, filepath, *rest:
+                commands = rest
+                add_tag(tag, filepath)
+
+            case "rm", tag, filepath, *rest:
+                commands = rest
+                rm_tag(tag, filepath)
+
+            case "mv", file, destination, *rest:
+                commands = rest
+                mv_tagged_file(file, destination)
+
+            case unrecognized, *rest:
+                commands = rest
+                raise RuntimeError(f"Unrecognized command '{unrecognized}'")
+
+
+def handle_argv(argv: list[str]) -> list[str]:
     """Handle argv."""
+    unparsed = []
     while argv:
         match argv:
             case ("-f", filepath, *rest) | ("--file", filepath, *rest):
                 argv = rest
                 if filepath == "-":
-                    run_batchfile(sys.stdin)
+                    run_interactive()
                 else:
                     with open(filepath, mode="r", encoding="utf-8") as file:
                         run_batchfile(file)
@@ -148,42 +201,29 @@ def handle_argv(argv: list[str]) -> None:
                 argv = rest
                 sys.exit(print_version())
 
-            case "ls", filepath, *rest:
-                argv = rest
-                ls_tags(filepath)
-
-            case "filter", tag, *rest:
-                if rest and Path(rest[0]).exists():
-                    argv = rest[1:]
-                    filter_tags(tag, rest[0])
-                else:
-                    argv = rest
-                    filter_tags(tag)
-
-            case "add", tag, filepath, *rest:
-                argv = rest
-                add_tag(tag, filepath)
-
-            case "rm", tag, filepath, *rest:
-                argv = rest
-                rm_tag(tag, filepath)
-
-            case "mv", file, destination, *rest:
-                argv = rest
-                mv_tagged_file(file, destination)
-
             case unrecognized, *rest:
                 argv = rest
-                print(f"Unrecognized option '{unrecognized}'")
-                print("Try 'python -m filetagging' for more information.")
-                sys.exit()
+                unparsed.append(unrecognized)
+                if unrecognized.startswith("-"):
+                    raise RuntimeError(f"Unrecognized option '{unrecognized}'")
+    return unparsed
 
 
 def main(argv: list[str]) -> int:
     """Package main."""
     if not argv:
-        sys.exit(print_help(long=False))
-    handle_argv(argv)
+        return print_help(long=False)
+
+    try:
+        run_commands(handle_argv(argv))
+    except RuntimeError as err:
+        print(err)
+        print("Try 'python -m filetagging' for more information.")
+        return 1
+    except Exception as err:
+        print(f"ERROR: {err}")
+        return 1
+
     return 0
 
 
